@@ -37,17 +37,29 @@ import android.widget.ProgressBar;
 import com.example.android.sunshine.data.SunshinePreferences;
 import com.example.android.sunshine.data.WeatherContract;
 import com.example.android.sunshine.sync.SunshineSyncUtils;
+import com.example.android.sunshine.utilities.ListenerActivity;
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallbacks;
-import com.google.android.gms.common.api.Status;
+import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
+import java.util.Random;
+
+
 public class MainActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor>,
-        ForecastAdapter.ForecastAdapterOnClickHandler{
+        ForecastAdapter.ForecastAdapterOnClickHandler,
+        DataApi.DataListener,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener{
 
     private final String TAG = MainActivity.class.getSimpleName();
 
@@ -95,11 +107,15 @@ public class MainActivity extends AppCompatActivity implements
                 .build();
     }
 
+    private ListenerActivity dataListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_forecast);
         getSupportActionBar().setElevation(0f);
+
+        dataListener = new ListenerActivity();
 
         /*
          * Using findViewById, we get a reference to our RecyclerView from xml. This allows us to
@@ -169,34 +185,82 @@ public class MainActivity extends AppCompatActivity implements
 
         SunshineSyncUtils.initialize(this);
 
-
-
-        GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
                 .build();
-        apiClient.connect();
-        Log.v("akrkeco","sending package");
 
-        if(apiClient.isConnected()){
-            //create the dataMapRequest with a path from constants.Path must start with a /
-            PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("weather");//Constants.RUN_UPDATE_NOTIFICATION);
-            putDataMapRequest.getDataMap().putString("sunny","weatherstate");//Constants.KEY_TITLE, "title");
-          //  putDataMapRequest.getDataMap().putString(Constants.KEY_CONTENT, "some other string data");
-            PutDataRequest request = putDataMapRequest.asPutDataRequest();
-            Wearable.DataApi.putDataItem(apiClient, request).setResultCallback(new ResultCallbacks<DataApi.DataItemResult>() {
-                @Override
-                public void onSuccess(@NonNull DataApi.DataItemResult dataItemResult) {
+        increaseCounter();
 
-                    Log.v("akrkeco","package sent");
+    }//oncreate
+
+//create datamap thing
+    private static final String COUNT_KEY = "com.example.key.count";
+
+    private GoogleApiClient mGoogleApiClient;
+    private int count = 0;
+    private Random random;
+
+    // Create a data map and put data in it
+    private void increaseCounter() {
+        PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/count");
+        count = 8;
+        putDataMapReq.getDataMap().putInt(COUNT_KEY, count);
+        PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+        PendingResult<DataApi.DataItemResult> pendingResult =
+                Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq);
+        Log.v("krkeco","increase counter complete "+COUNT_KEY+" "+count);
+    }
+
+    //receive it
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Wearable.DataApi.addListener(mGoogleApiClient, this);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        mGoogleApiClient.disconnect();
+    }
+
+    @Override
+    public void onDataChanged(DataEventBuffer dataEvents) {
+        for (DataEvent event : dataEvents) {
+            if (event.getType() == DataEvent.TYPE_CHANGED) {
+                // DataItem changed
+                DataItem item = event.getDataItem();
+                if (item.getUri().getPath().compareTo("/count") == 0) {
+                    DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
+                    updateCount(dataMap.getInt(COUNT_KEY));
                 }
-
-                @Override
-                public void onFailure(@NonNull Status status) {
-                    Log.v("akrkeco","package failed");
-                }
-            });
+            } else if (event.getType() == DataEvent.TYPE_DELETED) {
+                // DataItem deleted
+            }
         }
     }
+
+    // Our method to update the count
+    private void updateCount(int c) {
+
+        Log.v("krkeco","the count retrieved is: "+c);
+    }
+
 
 
     /**
@@ -225,15 +289,6 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    /**
-     * Called by the {@link android.support.v4.app.LoaderManagerImpl} when a new Loader needs to be
-     * created. This Activity only uses one loader, so we don't necessarily NEED to check the
-     * loaderId, but this is certainly best practice.
-     *
-     * @param loaderId The loader ID for which we need to create a loader
-     * @param bundle   Any arguments supplied by the caller
-     * @return A new Loader instance that is ready to start loading.
-     */
     @Override
     public Loader<Cursor> onCreateLoader(int loaderId, Bundle bundle) {
 
@@ -385,5 +440,11 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
     }
 }

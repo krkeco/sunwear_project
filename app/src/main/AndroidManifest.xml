@@ -36,6 +36,8 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+
+
         <!--The manifest entry for our MainActivity. Each Activity requires a manifest entry-->
         <activity
             android:name=".MainActivity"
@@ -82,7 +84,11 @@
             <intent-filter>
                 <action android:name="com.firebase.jobdispatcher.ACTION_EXECUTE"/>
             </intent-filter>
-        </service>
+        </service><!-- ATTENTION: This was auto-generated to add Google Play services to your project for
+     App Indexing.  See https://g.co/AppIndexing/AndroidStudio for more information. -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
 
     </application>
 </manifest>
