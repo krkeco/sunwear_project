@@ -12,7 +12,6 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License
-
 */
 
 package com.example.android.sunshine;
@@ -94,6 +93,7 @@ public class AnalogWatchFaceService extends CanvasWatchFaceService {
 
         private Paint mBackgroundPaint;
         private Bitmap mBackgroundBitmap;
+        private Bitmap mCenterPieceBitmap;
 
         private Paint mDataPaint;
 
@@ -168,7 +168,7 @@ public class AnalogWatchFaceService extends CanvasWatchFaceService {
 
             mBackgroundPaint = new Paint();
             mBackgroundPaint.setColor(Color.BLACK);
-            mBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.cspace);
+            mBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
 
             mCenterPiecePaint = new Paint();
             mCenterPiecePaint.setColor(Color.BLACK);
@@ -332,7 +332,6 @@ public class AnalogWatchFaceService extends CanvasWatchFaceService {
             mCenterY = height / 2f;
 
             scaleBit(mBackgroundBitmap,width,height,1);
-
         }
 
         public void scaleBit(Bitmap bitMap, int width, int height, float num){
@@ -343,10 +342,7 @@ public class AnalogWatchFaceService extends CanvasWatchFaceService {
                     (int) (bitMap.getWidth() * scale),
                     (int) (bitMap.getHeight() * scale), true);
 
-
         }
-
-
 
 
         @Override
@@ -357,14 +353,8 @@ public class AnalogWatchFaceService extends CanvasWatchFaceService {
             long now = System.currentTimeMillis();
             mCalendar.setTimeInMillis(now);
 
-
-            Log.v("krkeco","watchface logging");
-
-
             if (mAmbient && (mLowBitAmbient || mBurnInProtection)) {
                 canvas.drawColor(Color.BLACK);
-
-
 
             } else {
                 canvas.drawBitmap(mBackgroundBitmap, 0, 0, mBackgroundPaint);
