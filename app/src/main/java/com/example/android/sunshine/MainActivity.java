@@ -15,12 +15,10 @@
  */
 package com.example.android.sunshine;
 
-import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
@@ -37,27 +35,21 @@ import android.widget.ProgressBar;
 import com.example.android.sunshine.data.SunshinePreferences;
 import com.example.android.sunshine.data.WeatherContract;
 import com.example.android.sunshine.sync.SunshineSyncUtils;
-import com.example.android.sunshine.utilities.ListenerActivity;
+import com.example.android.sunshine.utilities.SunshineDateUtils;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.wearable.DataApi;
-import com.google.android.gms.wearable.DataEvent;
-import com.google.android.gms.wearable.DataEventBuffer;
-import com.google.android.gms.wearable.DataItem;
-import com.google.android.gms.wearable.DataMap;
-import com.google.android.gms.wearable.DataMapItem;
-import com.google.android.gms.wearable.PutDataMapRequest;
-import com.google.android.gms.wearable.PutDataRequest;
+import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 
-import java.util.Random;
+import static com.example.android.sunshine.utilities.NotificationUtils.INDEX_WEATHER_ID;
+import static com.example.android.sunshine.utilities.NotificationUtils.WEATHER_NOTIFICATION_PROJECTION;
 
 
 public class MainActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor>,
         ForecastAdapter.ForecastAdapterOnClickHandler,
-        DataApi.DataListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener{
 
@@ -101,13 +93,6 @@ public class MainActivity extends AppCompatActivity implements
 
     private ProgressBar mLoadingIndicator;
 
-    private GoogleApiClient getGoogleApiClient(Context context) {
-        return new GoogleApiClient.Builder(context)
-                .addApi(Wearable.API)
-                .build();
-    }
-
-    private ListenerActivity dataListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,7 +100,6 @@ public class MainActivity extends AppCompatActivity implements
         setContentView(R.layout.activity_forecast);
         getSupportActionBar().setElevation(0f);
 
-        dataListener = new ListenerActivity();
 
         /*
          * Using findViewById, we get a reference to our RecyclerView from xml. This allows us to
@@ -185,82 +169,76 @@ public class MainActivity extends AppCompatActivity implements
 
         SunshineSyncUtils.initialize(this);
 
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
+
+        connectGoo();
+    }//oncreate
+
+        GoogleApiClient googleClient;
+
+    public void connectGoo(){
+        googleClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
-
-        increaseCounter();
-
-    }//oncreate
-
-//create datamap thing
-    private static final String COUNT_KEY = "com.example.key.count";
-
-    private GoogleApiClient mGoogleApiClient;
-    private int count = 0;
-    private Random random;
-
-    // Create a data map and put data in it
-    private void increaseCounter() {
-        PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/count");
-        count = 8;
-        putDataMapReq.getDataMap().putInt(COUNT_KEY, count);
-        PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
-        PendingResult<DataApi.DataItemResult> pendingResult =
-                Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq);
-        Log.v("krkeco","increase counter complete "+COUNT_KEY+" "+count);
     }
 
-    //receive it
+        // Connect to the data layer when the Activity starts
+        @Override
+        protected void onStart() {
+            super.onStart();
+            googleClient.connect();
+        }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mGoogleApiClient.connect();
-    }
+    static String mMessage = "800";
+        // Send a message when the data layer connection is successful.
+        @Override
+        public void onConnected(Bundle connectionHint) {
+            //Requires a new thread to avoid blocking the UI
+      //      new SendToDataLayerThread("/message_path", mMessage).start();
+        }
 
-    @Override
-    public void onConnected(Bundle bundle) {
-        Wearable.DataApi.addListener(mGoogleApiClient, this);
-    }
+        // Disconnect from the data layer when the Activity stops
+        @Override
+        protected void onStop() {
+            if (null != googleClient && googleClient.isConnected()) {
+                googleClient.disconnect();
+            }
+            super.onStop();
+        }
 
-    @Override
-    public void onConnectionSuspended(int i) {
+        // Placeholders for required connection callbacks
+        @Override
+        public void onConnectionSuspended(int cause) { }
 
-    }
+        @Override
+        public void onConnectionFailed(ConnectionResult connectionResult) { }
 
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        Wearable.DataApi.removeListener(mGoogleApiClient, this);
-        mGoogleApiClient.disconnect();
-    }
+    class SendToDataLayerThread extends Thread {
+        String path;
+        String message;
 
-    @Override
-    public void onDataChanged(DataEventBuffer dataEvents) {
-        for (DataEvent event : dataEvents) {
-            if (event.getType() == DataEvent.TYPE_CHANGED) {
-                // DataItem changed
-                DataItem item = event.getDataItem();
-                if (item.getUri().getPath().compareTo("/count") == 0) {
-                    DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
-                    updateCount(dataMap.getInt(COUNT_KEY));
+        // Constructor to send a message to the data layer
+        SendToDataLayerThread(String p, String msg) {
+            path = p;
+            message = msg;
+        }
+
+        public void run() {
+            NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(googleClient).await();
+            for (Node node : nodes.getNodes()) {
+                MessageApi.SendMessageResult result = Wearable.MessageApi.sendMessage(googleClient, node.getId(), path, message.getBytes()).await();
+                if (result.getStatus().isSuccess()) {
+                    Log.v("myTag", "Message: {" + message + "} sent to: " + node.getDisplayName());
+                } else {
+                    // Log an error
+                    Log.v("myTag", "ERROR: failed to send Message");
                 }
-            } else if (event.getType() == DataEvent.TYPE_DELETED) {
-                // DataItem deleted
             }
         }
+
     }
-
-    // Our method to update the count
-    private void updateCount(int c) {
-
-        Log.v("krkeco","the count retrieved is: "+c);
-    }
-
 
 
     /**
@@ -333,6 +311,22 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
 
+        Uri todaysWeatherUri = WeatherContract.WeatherEntry
+                .buildWeatherUriWithDate(SunshineDateUtils.normalizeDate(System.currentTimeMillis()));
+
+   Cursor todayWeatherCursor = this.getContentResolver().query(
+                todaysWeatherUri,
+                WEATHER_NOTIFICATION_PROJECTION,
+                null,
+                null,
+                null);
+
+        if (todayWeatherCursor.moveToFirst()) {
+            int weatherId = todayWeatherCursor.getInt(INDEX_WEATHER_ID);
+            mMessage = Integer.toString(weatherId);
+            new SendToDataLayerThread("/message_path", mMessage).start();
+
+        }
 
         mForecastAdapter.swapCursor(data);
         if (mPosition == RecyclerView.NO_POSITION) mPosition = 0;
@@ -443,8 +437,4 @@ public class MainActivity extends AppCompatActivity implements
     }
 
 
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
-    }
 }
