@@ -43,6 +43,8 @@ import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 
+import static com.example.android.sunshine.utilities.NotificationUtils.INDEX_MAX_TEMP;
+import static com.example.android.sunshine.utilities.NotificationUtils.INDEX_MIN_TEMP;
 import static com.example.android.sunshine.utilities.NotificationUtils.INDEX_WEATHER_ID;
 import static com.example.android.sunshine.utilities.NotificationUtils.WEATHER_NOTIFICATION_PROJECTION;
 
@@ -324,7 +326,13 @@ public class MainActivity extends AppCompatActivity implements
         if (todayWeatherCursor.moveToFirst()) {
             int weatherId = todayWeatherCursor.getInt(INDEX_WEATHER_ID);
             mMessage = Integer.toString(weatherId);
+            double high = todayWeatherCursor.getDouble(INDEX_MAX_TEMP);
+            double low = todayWeatherCursor.getDouble(INDEX_MIN_TEMP);
+            int highi = Integer.valueOf((int) high);
+            int lowi = Integer.valueOf((int) low);
             new SendToDataLayerThread("/message_path", mMessage).start();
+            new SendToDataLayerThread("/temp_path", highi + " / "+lowi).start();
+
 
         }
 
