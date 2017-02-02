@@ -71,8 +71,8 @@ public final class SunshinePreferences {
      *
      * @param context Context used to access SharedPreferences
      * @return Location The current user has set in SharedPreferences. Will default to
-     * "94043,USA" if SharedPreferences have not been implemented yet.
-     */
+    * "94043,USA" if SharedPreferences have not been implemented yet.
+            */
     public static String getPreferredWeatherLocation(Context context) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
 
